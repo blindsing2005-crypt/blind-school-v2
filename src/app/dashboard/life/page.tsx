@@ -22,9 +22,17 @@ export default function SchoolLifePage() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    event_date: new Date().toISOString().split('T')[0],
+    event_date: "", // ✅ On laisse vide au départ
     event_type: "Activité"
   });
+
+  // ✅ On ajoute la date une fois que la page est chargée (côté client)
+  useEffect(() => {
+    setFormData(prev => ({ 
+      ...prev, 
+      event_date: new Date().toISOString().split('T')[0] 
+    }));
+  }, []);
 
   const eventTypes = [
     { label: "Examen", color: "bg-red-100 text-red-700 border-red-200", icon: BookOpen },
@@ -37,7 +45,6 @@ export default function SchoolLifePage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return router.push("/login");
 
-    // ✅ Récupérer l'ID de l'école
     const { data: userProfile } = await supabase.from("school_users").select("school_id, username, role").eq("email", user.email).maybeSingle();
     const schoolIdToUse = userProfile?.school_id || user.id;
     
@@ -64,12 +71,11 @@ export default function SchoolLifePage() {
     setSaving(true);
     
     const { error } = await supabase.from("events").insert([{
-      school_id: actualSchoolId, // ✅ ID de l'école
+      school_id: actualSchoolId,
       ...formData
     }]);
 
     if (!error) {
-      // ✅ Log de l'action
       await supabase.from("activity_logs").insert([{
         school_id: actualSchoolId,
         user_name: `${username} (${userRole})`,

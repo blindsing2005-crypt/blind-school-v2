@@ -36,9 +36,17 @@ export default function ReportsPage() {
   // Modal Dépenses
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
-    description: "", amount: "", recipient: "", date: new Date().toISOString().split('T')[0]
+    description: "", amount: "", recipient: "", date: "" // ✅ On laisse vide au départ
   });
   const [savingExpense, setSavingExpense] = useState(false);
+
+  // ✅ On ajoute la date une fois que la page est chargée (côté client)
+  useEffect(() => {
+    setExpenseForm(prev => ({ 
+      ...prev, 
+      date: new Date().toISOString().split('T')[0] 
+    }));
+  }, []);
 
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
