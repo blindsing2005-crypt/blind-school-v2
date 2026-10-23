@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { 
   LayoutDashboard, Users, Wallet, GraduationCap, 
   Calendar, Settings, LogOut, Search, X, Loader2, CheckCircle2, 
-  TrendingUp, CreditCard, ShieldCheck, HelpCircle, Info, User, Phone, Printer, Check, RefreshCcw, AlertTriangle, Lock, Mail, MessageCircle
+  TrendingUp, CreditCard, ShieldCheck, HelpCircle, Info, User, Phone, Printer, Check, RefreshCcw, AlertTriangle, Lock, Mail, MessageCircle, Menu
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -29,6 +29,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // ID réel de l'école
   const [actualSchoolId, setActualSchoolId] = useState<string>("");
   
+  // ✅ État pour gérer le menu mobile
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // Recherche
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,13 +53,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [savingPayment, setSavingPayment] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
 
+  // ✅ Fermer le menu mobile quand on change de page
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
   useEffect(() => {
     const getUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return router.push("/login");
       setUser(session.user);
       
-      // 1. Récupérer le profil
       const { data: userProfile } = await supabase
         .from("school_users")
         .select("role, username, permissions, school_id")
@@ -71,7 +78,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (userProfile.permissions) setPermissions(userProfile.permissions);
         currentSchoolId = userProfile.school_id;
       } else {
-        // Admin principal
         setUserRole("Administrateur");
         setUsername("Administrateur");
         setPermissions({ dashboard: true, students: true, re_enrollment: true, finance: true, reports: true, staff: true, life: true });
@@ -79,26 +85,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       
       setActualSchoolId(currentSchoolId);
 
-      // 2. Infos École
       const { data: schoolData } = await supabase.from("school_settings").select("*").eq("school_id", currentSchoolId).single();
       if (schoolData) setSchoolInfo(schoolData);
       
-      // 3. Frais
       const { data: feesData } = await supabase.from("fees").select("*").eq("school_id", currentSchoolId);
       if (feesData) setFees(feesData);
 
-      // 4. Année active
       const { data: yearsData } = await supabase.from("academic_years").select("*").eq("school_id", currentSchoolId).eq("is_active", true);
       if (yearsData && yearsData.length > 0) setActiveYear(yearsData[0]);
 
-      // 5. Abonnement
       const { data: subData } = await supabase.from("subscriptions").select("*").eq("school_id", currentSchoolId).maybeSingle();
       if (subData) setSubscription(subData);
     };
     getUser();
   }, [router]);
 
-  // --- ✅ RECHARGER LES ÉLÈVES À CHAQUE OUVERTURE DE LA RECHERCHE ---
+  // --- RECHARGER LES ÉLÈVES À CHAQUE OUVERTURE DE LA RECHERCHE ---
   useEffect(() => {
     if (isSearchOpen && actualSchoolId) {
       const fetchLatestStudents = async () => {
@@ -112,7 +114,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [isSearchOpen, actualSchoolId]);
 
-  // --- RECHERCHE LOCALE (Instantanée et fiable) ---
+  // --- RECHERCHE LOCALE ---
   useEffect(() => {
     if (searchQuery.length < 2) {
       setSearchResults([]);
@@ -204,7 +206,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const { data, error } = await supabase.from("payments").insert([newPayment]).select(`*, students ( * ), fees ( name )`);
 
     if (!error && data) {
-      // Log
       await supabase.from("activity_logs").insert([{
         school_id: actualSchoolId,
         user_name: `${username} (${userRole})`,
@@ -257,25 +258,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: "Abonnement & Licence", href: "/dashboard/subscription", icon: CreditCard, color: "text-rose-600", bg: "bg-rose-100" },
   ] : [];
 
-  // Calcul statut abonnement
   const isExpired = subscription && (subscription.status === 'Suspendu' || new Date(subscription.end_date) < new Date());
   const daysLeft = subscription ? Math.ceil((new Date(subscription.end_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-slate-100">
-          <div className="relative w-10 h-10 shrink-0">
-            {schoolInfo.school_logo_url ? (
-              <img src={schoolInfo.school_logo_url} alt="Logo" className="w-full h-full object-contain rounded-lg" />
-            ) : (
-              <Image src="/logo.png" alt="Logo" fill sizes="40px" className="object-contain" />
-            )}
+      
+      {/* ✅ OVERLAY SOMBRE QUAND LE MENU EST OUVERT SUR MOBILE */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 z-30 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        ></div>
+      )}
+
+      {/* ✅ SIDEBAR RESPONSIVE */}
+      <aside className={`w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-40 transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+        <div className="p-6 flex items-center justify-between border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="relative w-10 h-10 shrink-0">
+              {schoolInfo.school_logo_url ? (
+                <img src={schoolInfo.school_logo_url} alt="Logo" className="w-full h-full object-contain rounded-lg" />
+              ) : (
+                <Image src="/logo.png" alt="Logo" fill sizes="40px" className="object-contain" />
+              )}
+            </div>
+            <div className="overflow-hidden">
+              <h1 className="font-bold text-slate-800 leading-tight truncate">{schoolInfo.school_name}</h1>
+              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">BLIND SCHOOL</p>
+            </div>
           </div>
-          <div className="overflow-hidden">
-            <h1 className="font-bold text-slate-800 leading-tight truncate">{schoolInfo.school_name}</h1>
-            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">BLIND SCHOOL</p>
-          </div>
+          {/* Bouton fermer mobile */}
+          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400 hover:text-slate-700 p-1">
+            <X className="w-6 h-6" />
+          </button>
         </div>
 
         <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
@@ -319,23 +335,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      <main className="flex-1 ml-64 flex flex-col relative">
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-8 sticky top-0 z-10">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-bold text-slate-800">{schoolInfo.school_name}</h2>
+      {/* ✅ CONTENU PRINCIPAL (ml-64 retiré sur mobile) */}
+      <main className="flex-1 md:ml-64 flex flex-col relative w-full">
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20">
+          <div className="flex items-center gap-3 md:gap-4">
+            {/* ✅ BOUTON HAMBURGER POUR MOBILE */}
+            <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden text-slate-600 p-1">
+              <Menu className="w-6 h-6" />
+            </button>
+            <h2 className="text-lg font-bold text-slate-800 hidden md:block">{schoolInfo.school_name}</h2>
           </div>
 
-          <div className="flex items-center gap-6">
-            <button onClick={() => setIsSearchOpen(true)} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-500 px-4 py-2 rounded-xl transition-colors w-64">
+          <div className="flex items-center gap-3 md:gap-6">
+            <button onClick={() => setIsSearchOpen(true)} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-500 px-3 py-2 rounded-xl transition-colors md:w-64">
               <Search className="w-4 h-4" />
-              <span className="text-sm">Rechercher (Élèves...)</span>
+              <span className="text-sm hidden md:inline">Rechercher (Élèves...)</span>
             </button>
 
-            <div className="flex items-center gap-3 border-l border-slate-200 pl-6">
-              <div className="bg-blue-100 text-blue-700 w-10 h-10 rounded-full flex items-center justify-center font-bold uppercase">
+            <div className="flex items-center gap-3 border-l border-slate-200 pl-3 md:pl-6">
+              <div className="bg-blue-100 text-blue-700 w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold uppercase text-sm md:text-base">
                 {username.charAt(0)}
               </div>
-              <div>
+              <div className="hidden md:block">
                 <p className="text-sm font-bold text-slate-800">{username}</p>
                 <p className="text-xs text-slate-500">{userRole}</p>
               </div>
@@ -343,7 +364,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <div className="flex-1 p-8 overflow-y-auto relative">
+        <div className="flex-1 p-4 md:p-8 overflow-y-auto relative">
           
           {/* ✅ BANNIÈRE D'ALERTE (3 JOURS) */}
           {subscription && !isExpired && daysLeft <= 3 && (
@@ -389,9 +410,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </main>
 
-      {/* MODAL DE RECHERCHE GLOBALE AVEC GESTION PAIEMENT */}
+      {/* MODAL DE RECHERCHE GLOBALE */}
       {isSearchOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-start justify-center pt-24 z-[60]">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-start justify-center pt-24 z-[60] px-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh]">
             
             <div className="flex items-center px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
@@ -404,7 +425,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button onClick={() => setIsSearchOpen(false)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full"><X className="w-5 h-5" /></button>
             </div>
 
-            <div className="overflow-y-auto p-6 relative">
+            <div className="overflow-y-auto p-4 md:p-6 relative">
               
               {isSearching && searchResults.length === 0 && (
                 <div className="py-10 text-center flex flex-col items-center">
@@ -438,10 +459,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
 
               {selectedStudent && !isSearching && !receiptData && (
-                <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
-                  <div className="flex justify-between items-start mb-6">
+                <div className="bg-slate-50 rounded-2xl p-4 md:p-6 border border-slate-200">
+                  <div className="flex flex-col md:flex-row justify-between items-start mb-6 gap-2">
                     <div>
-                      <h3 className="text-2xl font-bold text-slate-900">{getStudentName(selectedStudent)}</h3>
+                      <h3 className="text-xl md:text-2xl font-bold text-slate-900">{getStudentName(selectedStudent)}</h3>
                       <p className="text-sm text-slate-500 font-mono mt-1">{selectedStudent.matricule || selectedStudent.id.substring(0,8)}</p>
                     </div>
                     <button onClick={() => { setSelectedStudent(null); setShowPaymentFlow(false); }} className="text-sm font-semibold text-slate-500 hover:text-slate-800 underline">
@@ -483,7 +504,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   )}
 
                   {!showPaymentFlow ? (
-                    <div className="flex gap-3">
+                    <div className="flex flex-col md:flex-row gap-3">
                       {permissions.finance && (
                         <button 
                           onClick={() => setShowPaymentFlow(true)} 
@@ -505,8 +526,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       {!selectedFeeToPay ? (
                         <>
                           <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Choisissez une tranche à payer</h3>
-                          <div className="border border-slate-200 rounded-xl overflow-hidden mb-4">
-                            <table className="w-full text-left text-sm bg-white">
+                          <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
+                            <table className="w-full text-left text-sm bg-white min-w-[400px]">
                               <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
                                   <th className="p-3">Tranche</th>
@@ -540,7 +561,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           <button onClick={() => setShowPaymentFlow(false)} className="text-slate-500 text-sm font-semibold hover:underline">Annuler le paiement</button>
                         </>
                       ) : (
-                        <form onSubmit={handleSavePayment} className="bg-white p-5 rounded-xl border border-blue-200 shadow-sm">
+                        <form onSubmit={handleSavePayment} className="bg-white p-4 md:p-5 rounded-xl border border-blue-200 shadow-sm">
                           <div className="bg-blue-50 p-4 rounded-xl mb-4 border border-blue-100">
                             <p className="text-xs text-blue-600 font-bold uppercase mb-1">Paiement de la tranche</p>
                             <h3 className="font-bold text-slate-800 text-lg">{selectedFeeToPay.name}</h3>
@@ -550,7 +571,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <input required type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 text-lg font-bold" />
                             <p className="text-xs text-slate-500 mt-2">Modifiable si l'élève paie une partie.</p>
                           </div>
-                          <div className="flex gap-3">
+                          <div className="flex flex-col md:flex-row gap-3">
                             <button type="button" onClick={() => setSelectedFeeToPay(null)} className="px-4 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">Retour</button>
                             <button type="submit" disabled={savingPayment || Number(paymentAmount) <= 0} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                               {savingPayment ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />} Valider
@@ -565,7 +586,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
               {receiptData && (
                 <div className="animate-in zoom-in-95 duration-300">
-                  <div className="flex justify-between items-center mb-4 print:hidden">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 print:hidden gap-2">
                     <div className="flex items-center gap-2 text-emerald-600 font-bold"><CheckCircle2 className="w-5 h-5" /> Paiement Enregistré</div>
                     <div className="flex gap-2">
                       <button 
@@ -582,81 +603,82 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                   </div>
                   
-                  <div className="bg-white p-8 md:p-14 text-slate-900 font-sans rounded-xl border border-slate-200 shadow-sm" id="receipt-print-area">
-                    <div className="flex items-center justify-between border-b-2 border-slate-900 pb-6 mb-8">
-                      <div className="flex items-center gap-6">
-                        {schoolInfo.school_logo_url ? (
-                          <img src={schoolInfo.school_logo_url} alt="Logo" className="w-24 h-24 object-contain" />
-                        ) : (
-                          <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">Logo</div>
-                        )}
+                  <div className="bg-white p-4 md:p-14 text-slate-900 font-sans rounded-xl border border-slate-200 shadow-sm overflow-x-auto" id="receipt-print-area">
+                    <div className="min-w-[500px]">
+                      <div className="flex items-center justify-between border-b-2 border-slate-900 pb-6 mb-8">
+                        <div className="flex items-center gap-6">
+                          {schoolInfo.school_logo_url ? (
+                            <img src={schoolInfo.school_logo_url} alt="Logo" className="w-24 h-24 object-contain" />
+                          ) : (
+                            <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">Logo</div>
+                          )}
+                          <div>
+                            <h1 className="text-xl font-bold uppercase tracking-wider text-slate-600">École</h1>
+                            <h2 className="text-3xl font-black uppercase text-blue-900">{schoolInfo.school_name}</h2>
+                            <p className="text-sm italic text-slate-500 mt-1">{schoolInfo.school_address}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-end mb-8">
                         <div>
-                          <h1 className="text-xl font-bold uppercase tracking-wider text-slate-600">École</h1>
-                          <h2 className="text-3xl font-black uppercase text-blue-900">{schoolInfo.school_name}</h2>
-                          <p className="text-sm italic text-slate-500 mt-1">{schoolInfo.school_address}</p>
+                          <h2 className="text-4xl font-black uppercase text-slate-800 tracking-tight">REÇU DE PAIEMENT</h2>
+                          <p className="text-slate-500 mt-2 font-medium">Date : <span className="text-slate-800 font-bold">{new Date(receiptData.created_at).toLocaleDateString('fr-FR')}</span></p>
+                        </div>
+                        <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-lg text-lg font-bold text-blue-900">
+                          N° {receiptData.receipt_number}
+                        </div>
+                      </div>
+
+                      <div className="mb-8">
+                        <div className="bg-blue-100 px-4 py-2 rounded-t-lg font-bold text-blue-900 text-lg">Informations de l'élève</div>
+                        <div className="border border-slate-200 border-t-0 rounded-b-lg p-6 space-y-2 text-base">
+                          <div className="flex"><span className="w-40 font-bold text-slate-600">Nom et prénom</span> <span className="font-bold text-slate-900">: {getStudentName(receiptData.students).toUpperCase()}</span></div>
+                          <div className="flex"><span className="w-40 font-bold text-slate-600">Classe</span> <span className="font-bold text-slate-900">: {receiptData.students?.class_name} {receiptData.students?.option && `(${receiptData.students.option})`}</span></div>
+                          <div className="flex"><span className="w-40 font-bold text-slate-600">Année scolaire</span> <span className="font-bold text-slate-900">: {receiptData.academic_year || activeYear?.name || "2024-2025"}</span></div>
+                        </div>
+                      </div>
+
+                      <div className="mb-10">
+                        <div className="bg-blue-100 px-4 py-2 rounded-t-lg font-bold text-blue-900 text-lg">Détail du paiement</div>
+                        <table className="w-full border-collapse border border-slate-200">
+                          <thead>
+                            <tr className="bg-blue-50 text-blue-900 border-b border-slate-200">
+                              <th className="py-3 px-4 text-left font-bold w-16 border-r border-slate-200 text-center">N°</th>
+                              <th className="py-3 px-4 text-left font-bold border-r border-slate-200">Description</th>
+                              <th className="py-3 px-4 text-right font-bold w-40">Montant (FC)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b border-slate-200">
+                              <td className="py-4 px-4 text-center border-r border-slate-200 text-slate-600">1</td>
+                              <td className="py-4 px-4 text-slate-800 font-medium">{receiptData.fees?.name || "Frais scolaires"}</td>
+                              <td className="py-4 px-4 text-right font-bold text-slate-900">{Number(receiptData.amount).toLocaleString()}</td>
+                            </tr>
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-blue-50">
+                              <td colSpan={2} className="py-4 px-4 text-right font-black text-blue-900 text-lg border-r border-slate-200">Montant total payé</td>
+                              <td className="py-4 px-4 text-right font-black text-blue-900 text-xl">{Number(receiptData.amount).toLocaleString()}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+
+                      <div className="text-center mt-12 pt-6 border-t border-slate-200">
+                        <p className="italic text-slate-600 font-medium">Veuillez garder jalousement ce reçu.</p>
+                        <div className="mt-12 flex justify-between px-10">
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-slate-400 uppercase mb-12">Signature du Parent</p>
+                            <div className="w-40 border-b border-slate-400"></div>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-bold text-slate-400 uppercase mb-12">Sceau de l'école</p>
+                            <div className="w-40 border-b border-slate-400"></div>
+                          </div>
                         </div>
                       </div>
                     </div>
-
-                    <div className="flex justify-between items-end mb-8">
-                      <div>
-                        <h2 className="text-4xl font-black uppercase text-slate-800 tracking-tight">REÇU DE PAIEMENT</h2>
-                        <p className="text-slate-500 mt-2 font-medium">Date : <span className="text-slate-800 font-bold">{new Date(receiptData.created_at).toLocaleDateString('fr-FR')}</span></p>
-                      </div>
-                      <div className="bg-blue-50 border border-blue-200 px-4 py-2 rounded-lg text-lg font-bold text-blue-900">
-                        N° {receiptData.receipt_number}
-                      </div>
-                    </div>
-
-                    <div className="mb-8">
-                      <div className="bg-blue-100 px-4 py-2 rounded-t-lg font-bold text-blue-900 text-lg">Informations de l'élève</div>
-                      <div className="border border-slate-200 border-t-0 rounded-b-lg p-6 space-y-2 text-base">
-                        <div className="flex"><span className="w-40 font-bold text-slate-600">Nom et prénom</span> <span className="font-bold text-slate-900">: {getStudentName(receiptData.students).toUpperCase()}</span></div>
-                        <div className="flex"><span className="w-40 font-bold text-slate-600">Classe</span> <span className="font-bold text-slate-900">: {receiptData.students?.class_name} {receiptData.students?.option && `(${receiptData.students.option})`}</span></div>
-                        <div className="flex"><span className="w-40 font-bold text-slate-600">Année scolaire</span> <span className="font-bold text-slate-900">: {receiptData.academic_year || activeYear?.name || "2024-2025"}</span></div>
-                      </div>
-                    </div>
-
-                    <div className="mb-10">
-                      <div className="bg-blue-100 px-4 py-2 rounded-t-lg font-bold text-blue-900 text-lg">Détail du paiement</div>
-                      <table className="w-full border-collapse border border-slate-200">
-                        <thead>
-                          <tr className="bg-blue-50 text-blue-900 border-b border-slate-200">
-                            <th className="py-3 px-4 text-left font-bold w-16 border-r border-slate-200 text-center">N°</th>
-                            <th className="py-3 px-4 text-left font-bold border-r border-slate-200">Description</th>
-                            <th className="py-3 px-4 text-right font-bold w-40">Montant (FC)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr className="border-b border-slate-200">
-                            <td className="py-4 px-4 text-center border-r border-slate-200 text-slate-600">1</td>
-                            <td className="py-4 px-4 text-slate-800 font-medium">{receiptData.fees?.name || "Frais scolaires"}</td>
-                            <td className="py-4 px-4 text-right font-bold text-slate-900">{Number(receiptData.amount).toLocaleString()}</td>
-                          </tr>
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-blue-50">
-                            <td colSpan={2} className="py-4 px-4 text-right font-black text-blue-900 text-lg border-r border-slate-200">Montant total payé</td>
-                            <td className="py-4 px-4 text-right font-black text-blue-900 text-xl">{Number(receiptData.amount).toLocaleString()}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-
-                    <div className="text-center mt-12 pt-6 border-t border-slate-200">
-                      <p className="italic text-slate-600 font-medium">Veuillez garder jalousement ce reçu.</p>
-                      <div className="mt-12 flex justify-between px-10">
-                        <div className="text-center">
-                          <p className="text-sm font-bold text-slate-400 uppercase mb-12">Signature du Parent</p>
-                          <div className="w-40 border-b border-slate-400"></div>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm font-bold text-slate-400 uppercase mb-12">Sceau de l'école</p>
-                          <div className="w-40 border-b border-slate-400"></div>
-                        </div>
-                      </div>
-                    </div>
-
                   </div>
                 </div>
               )}
