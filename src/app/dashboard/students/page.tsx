@@ -417,7 +417,7 @@ export default function StudentsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Nom, Post-nom & Prénom</label>
-                  <input required type="text" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: KABILA MUKENDI Jean" />
+                  <input required type="text" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: NDOBOLA KABEYA Bel ange" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Sexe</label>

@@ -163,10 +163,10 @@ export default function UsersPage() {
     alert("Utilisateur supprimé définitivement. Vous pouvez réutiliser cet email.");
   };
 
-  const togglePermission = (perm: string) => {
+    const togglePermission = (perm: string) => {
     setFormData(prev => ({
       ...prev,
-      permissions: { ...prev.permissions, [perm]: !prev.permissions[perm] }
+      permissions: { ...prev.permissions, [perm]: !(prev.permissions as any)[perm] }
     }));
   };
 

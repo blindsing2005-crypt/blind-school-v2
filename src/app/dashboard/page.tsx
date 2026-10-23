@@ -29,7 +29,7 @@ export default function DashboardPage() {
       const { data: userProfile } = await supabase.from("school_users").select("username, permissions, school_id").eq("email", user.email).maybeSingle();
       
       let currentSchoolId = user.id;
-      let userPerms = { dashboard: true, finance: false };
+      let userPerms: any = { dashboard: true, finance: false };
 
       if (userProfile) {
         setUsername(userProfile.username || "Utilisateur");
