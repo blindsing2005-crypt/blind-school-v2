@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* =========================================
+   RÈGLES D'IMPRESSION (Rapports A4)
+   ========================================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* On cache la sidebar, le header et les boutons */
+  aside, header, nav, .print\:hidden, .no-print {
+    display: none !important;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* On ajuste le contenu principal pour qu'il prenne toute la page */
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* On force l'impression des couleurs de fond (graphiques, badges...) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* =========================================
+   RÈGLES SPÉCIFIQUES POUR LES REÇUS
+   ========================================= */
+@media print {
+  /* Si on imprime un reçu, on cache tout le reste */
+  body.printing-receipt * {
+    visibility: hidden;
+  }
+  
+  body.printing-receipt #receipt-print-area,
+  body.printing-receipt #receipt-print-area * {
+    visibility: visible;
+  }
+  
+  body.printing-receipt #receipt-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    padding: 15px;
+    background: white;
+  }
 }
