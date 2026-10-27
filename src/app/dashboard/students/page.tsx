@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { 
   UserPlus, X, Loader2, Users, FileText, CheckCircle2, 
   Phone, MapPin, RefreshCw, Search, Check, AlertCircle, 
-  UserMinus, Trash2, Wallet 
+  UserMinus, Trash2, Wallet, Edit
 } from "lucide-react";
 
 export default function StudentsPage() {
@@ -30,6 +30,7 @@ export default function StudentsPage() {
 
   // Modaux
   const [isModalOpen, setIsModalOpen] = useState(false); 
+  const [editingStudent, setEditingStudent] = useState<any>(null); // ✅ AJOUT : Pour gérer l'édition
   const [selectedStudent, setSelectedStudent] = useState<any>(null); 
   const [studentPayments, setStudentPayments] = useState<any[]>([]);
 
@@ -101,52 +102,124 @@ export default function StudentsPage() {
     return true;
   };
 
-  const handleAddStudent = async (e: React.FormEvent) => {
+  // ✅ AJOUT : Ouvrir le modal en mode ÉDITION
+  const openEditModal = (student: any) => {
+    setEditingStudent(student);
+    
+    // On retrouve l'ID de la classe à partir de son nom
+    const matchingClass = classes.find(c => c.name === student.class_name && c.level === student.level);
+    
+    setFormData({
+      fullName: student.full_name || "",
+      gender: student.gender || "M",
+      birthDate: student.birth_date || "",
+      birthPlace: student.birth_place || "",
+      previousSchool: student.previous_school || "",
+      parentName: student.parent_name || "",
+      parentPhone: student.parent_phone || "",
+      parentAddress: student.parent_address || "",
+      level: student.level || "",
+      classId: matchingClass?.id || "",
+      option: student.option || ""
+    });
+    setIsModalOpen(true);
+  };
+
+  // ✅ AJOUT : Ouvrir le modal en mode CRÉATION
+  const openCreateModal = () => {
+    setEditingStudent(null);
+    setFormData({ 
+      fullName: "", gender: "M", birthDate: "", birthPlace: "", previousSchool: "",
+      parentName: "", parentPhone: "", parentAddress: "",
+      level: "", classId: "", option: "" 
+    });
+    setIsModalOpen(true);
+  };
+
+  // ✅ MODIFIÉ : Gère à la fois la création et la modification
+  const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeYear) return alert("Veuillez d'abord configurer une année scolaire active.");
     
     setSaving(true);
     const selectedClass = classes.find(c => c.id === formData.classId);
-    const generatedMatricule = `BS-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const newStudent = {
-      school_id: actualSchoolId, // ✅ Utilisation du bon ID
-      class_id: formData.classId, 
-      full_name: formData.fullName,
-      gender: formData.gender, 
-      birth_date: formData.birthDate || null,
-      birth_place: formData.birthPlace,
-      previous_school: formData.previousSchool,
-      parent_name: formData.parentName,
-      parent_phone: formData.parentPhone,
-      parent_address: formData.parentAddress,
-      status: "Actif",
-      level: formData.level,
-      class_name: selectedClass?.name, 
-      option: showOptionField() ? formData.option : null,
-      matricule: generatedMatricule, 
-      academic_year: activeYear.name
-    };
+    if (editingStudent) {
+      // --- MODE MODIFICATION ---
+      const updatedData = {
+        full_name: formData.fullName,
+        gender: formData.gender,
+        birth_date: formData.birthDate || null,
+        birth_place: formData.birthPlace,
+        previous_school: formData.previousSchool,
+        parent_name: formData.parentName,
+        parent_phone: formData.parentPhone,
+        parent_address: formData.parentAddress,
+        level: formData.level,
+        class_id: formData.classId,
+        class_name: selectedClass?.name,
+        option: showOptionField() ? formData.option : null,
+      };
 
-    const { data, error } = await supabase.from("students").insert([newStudent]).select();
+      const { data, error } = await supabase.from("students").update(updatedData).eq("id", editingStudent.id).select();
 
-    if (error) alert("Erreur : " + error.message);
-    else if (data) {
-      // ✅ Ajouter dans l'historique
-      await supabase.from("activity_logs").insert([{
-        school_id: actualSchoolId,
-        user_name: `${username} (${userRole})`,
-        action: "Inscription",
-        details: `A inscrit l'élève ${formData.fullName} en ${formData.level} ${selectedClass?.name}`
-      }]);
+      if (error) alert("Erreur de modification : " + error.message);
+      else if (data) {
+        setStudents(students.map(s => s.id === editingStudent.id ? data[0] : s));
+        
+        // Log de modification
+        await supabase.from("activity_logs").insert([{
+          school_id: actualSchoolId,
+          user_name: `${username} (${userRole})`,
+          action: "Modification",
+          details: `A modifié les informations de l'élève ${formData.fullName}`
+        }]);
 
-      setStudents([data[0], ...students]);
-      setIsModalOpen(false);
-      setFormData({ 
-        fullName: "", gender: "M", birthDate: "", birthPlace: "", previousSchool: "",
-        parentName: "", parentPhone: "", parentAddress: "",
-        level: "", classId: "", option: "" 
-      });
+        setIsModalOpen(false);
+        setEditingStudent(null);
+      }
+    } else {
+      // --- MODE CRÉATION (Ton code original) ---
+      const generatedMatricule = `BS-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const newStudent = {
+        school_id: actualSchoolId, 
+        class_id: formData.classId, 
+        full_name: formData.fullName,
+        gender: formData.gender, 
+        birth_date: formData.birthDate || null,
+        birth_place: formData.birthPlace,
+        previous_school: formData.previousSchool,
+        parent_name: formData.parentName,
+        parent_phone: formData.parentPhone,
+        parent_address: formData.parentAddress,
+        status: "Actif",
+        level: formData.level,
+        class_name: selectedClass?.name, 
+        option: showOptionField() ? formData.option : null,
+        matricule: generatedMatricule, 
+        academic_year: activeYear.name
+      };
+
+      const { data, error } = await supabase.from("students").insert([newStudent]).select();
+
+      if (error) alert("Erreur : " + error.message);
+      else if (data) {
+        await supabase.from("activity_logs").insert([{
+          school_id: actualSchoolId,
+          user_name: `${username} (${userRole})`,
+          action: "Inscription",
+          details: `A inscrit l'élève ${formData.fullName} en ${formData.level} ${selectedClass?.name}`
+        }]);
+
+        setStudents([data[0], ...students]);
+        setIsModalOpen(false);
+        setFormData({ 
+          fullName: "", gender: "M", birthDate: "", birthPlace: "", previousSchool: "",
+          parentName: "", parentPhone: "", parentAddress: "",
+          level: "", classId: "", option: "" 
+        });
+      }
     }
     setSaving(false);
   };
@@ -201,7 +274,6 @@ export default function StudentsPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       
-      {/* (Le reste du code de la page est identique à ce que tu as déjà) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Élèves & Inscriptions</h1>
@@ -211,7 +283,7 @@ export default function StudentsPage() {
           <button onClick={() => router.push('/dashboard/re-enrollment')} className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2">
             <RefreshCw className="w-5 h-5 text-emerald-600" /> Réinscription
           </button>
-          <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 shadow-lg shadow-blue-200">
+          <button onClick={openCreateModal} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 shadow-lg shadow-blue-200">
             <UserPlus className="w-5 h-5" /> Nouvelle inscription
           </button>
         </div>
@@ -301,8 +373,14 @@ export default function StudentsPage() {
                         {student.status || 'Actif'}
                       </span>
                     </td>
-                    <td className="p-4 text-right">
-                      <button onClick={() => openStudentProfile(student)} className="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors text-sm font-semibold flex items-center gap-1 ml-auto">
+                    <td className="p-4 text-right flex justify-end gap-2">
+                      {/* ✅ BOUTON MODIFIER */}
+                      <button onClick={() => openEditModal(student)} className="text-orange-600 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors text-sm font-semibold flex items-center gap-1" title="Modifier">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      
+                      {/* BOUTON FICHE */}
+                      <button onClick={() => openStudentProfile(student)} className="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors text-sm font-semibold flex items-center gap-1">
                         <FileText className="w-4 h-4" /> Fiche
                       </button>
                     </td>
@@ -406,10 +484,12 @@ export default function StudentsPage() {
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h2 className="text-xl font-bold text-slate-800">Nouvelle Inscription ({activeYear?.name})</h2>
+              <h2 className="text-xl font-bold text-slate-800">
+                {editingStudent ? "Modifier l'élève" : `Nouvelle Inscription (${activeYear?.name})`}
+              </h2>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700 bg-white rounded-full p-1 shadow-sm"><X className="w-5 h-5" /></button>
             </div>
-            <form onSubmit={handleAddStudent} className="p-6 overflow-y-auto">
+            <form onSubmit={handleSaveStudent} className="p-6 overflow-y-auto">
               
               <h3 className="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <UserPlus className="w-4 h-4" /> 1. Informations de l'élève
@@ -490,7 +570,8 @@ export default function StudentsPage() {
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-100">Annuler</button>
                 <button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 disabled:opacity-50">
-                  {saving && <Loader2 className="w-4 h-4 animate-spin" />} Enregistrer l'élève
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />} 
+                  {editingStudent ? "Enregistrer les modifications" : "Enregistrer l'élève"}
                 </button>
               </div>
             </form>
