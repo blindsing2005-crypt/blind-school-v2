@@ -49,13 +49,11 @@ export default function FinancePage() {
     if (!user) return router.push("/login");
     setUser(user);
 
-    // ✅ 1. Récupérer l'ID de l'école et vérifier les permissions
     const { data: userProfile } = await supabase.from("school_users").select("school_id, username, role, permissions").eq("email", user.email).maybeSingle();
     
-    // Sécurité : Si ce n'est pas l'admin et qu'il n'a pas la permission Finance
     if (userProfile && !userProfile.permissions?.finance) {
       alert("⛔ Accès refusé. Vous n'avez pas la permission de voir les finances.");
-      return router.push("/dashboard"); // Renvoi immédiat au tableau de bord
+      return router.push("/dashboard");
     }
 
     const schoolIdToUse = userProfile?.school_id || user.id;
@@ -160,7 +158,6 @@ export default function FinancePage() {
     const { data, error } = await supabase.from("payments").insert([newPayment]).select(`*, students ( * ), fees ( name )`);
 
     if (!error && data) {
-      // ✅ Enregistrer dans l'historique
       await supabase.from("activity_logs").insert([{
         school_id: actualSchoolId,
         user_name: `${username} (${userRole})`,
@@ -224,13 +221,43 @@ export default function FinancePage() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       
+      {/* --- EN-TÊTE D'IMPRESSION UNIQUEMENT --- */}
+      <div className="hidden print:block mb-8 border-b-2 border-slate-800 pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {schoolInfo?.logo_url && <img src={schoolInfo.logo_url} className="w-16 h-16 object-contain" />}
+            <div>
+              <h1 className="text-2xl font-black uppercase">{schoolInfo.school_name}</h1>
+              <p className="text-sm font-bold">Année : {activeYear?.name}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <h2 className="text-xl font-bold uppercase">Situation Financière</h2>
+            <p className="text-sm">Imprimé le {new Date().toLocaleDateString('fr-FR')}</p>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-between bg-slate-100 p-4 rounded-lg">
+          <div><span className="font-bold text-sm">Total Attendu :</span> <span className="font-black">{filteredStats.totalDue.toLocaleString()} {schoolInfo.currency}</span></div>
+          <div><span className="font-bold text-sm">Total Encaissé :</span> <span className="font-black text-emerald-700">{filteredStats.totalPaid.toLocaleString()} {schoolInfo.currency}</span></div>
+          <div><span className="font-bold text-sm">Solde Restant :</span> <span className="font-black text-red-700">{filteredStats.balance.toLocaleString()} {schoolInfo.currency}</span></div>
+        </div>
+        <div className="mt-2 text-sm font-semibold">
+          Filtres : {filterLevel || "Tous niveaux"} | {filterClass || "Toutes classes"} | {filterOption || "Toutes options"}
+        </div>
+      </div>
+
       {/* EN-TÊTE ET ONGLETS */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 mb-1">Paiements & Minerval</h1>
           <p className="text-slate-500 text-sm">Gestion des tranches et reçus</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {/* ✅ BOUTON IMPRIMER */}
+          <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-md">
+            <Printer className="w-4 h-4" /> Imprimer
+          </button>
+
           <button onClick={() => setActiveTab("tracking")} className={`px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all ${activeTab === "tracking" ? "bg-blue-600 text-white shadow-md" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}><Wallet className="w-4 h-4" /> Suivi</button>
           <button onClick={() => setActiveTab("history")} className={`px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all ${activeTab === "history" ? "bg-blue-600 text-white shadow-md" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}><History className="w-4 h-4" /> Historique</button>
           <button onClick={() => setActiveTab("fees")} className={`px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all ${activeTab === "fees" ? "bg-blue-600 text-white shadow-md" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}><Settings className="w-4 h-4" /> Voir Tarifs</button>
@@ -238,7 +265,7 @@ export default function FinancePage() {
       </div>
 
       {/* STATS DYNAMIQUES */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 border-l-4 border-l-slate-800 shadow-sm">
           <p className="text-sm font-semibold text-slate-500 uppercase">Total Attendu</p>
           <p className="text-3xl font-black text-slate-800 mt-1">{filteredStats.totalDue.toLocaleString()} {schoolInfo.currency}</p>
@@ -254,7 +281,7 @@ export default function FinancePage() {
       </div>
 
       {/* FILTRES */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center print:hidden">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
           <input type="text" placeholder="Rechercher un élève..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
@@ -287,24 +314,24 @@ export default function FinancePage() {
 
       {/* SUIVI DES ÉLÈVES */}
       {activeTab === "tracking" && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
+          <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 print:hidden">
             <p className="text-sm font-bold text-slate-700">{filteredStudents.length} élève(s) trouvé(s)</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200 print:bg-transparent print:text-slate-800 print:border-slate-800">
                   <th className="p-4 font-semibold">Élève</th>
                   <th className="p-4 font-semibold">Classe / Option</th>
                   <th className="p-4 font-semibold text-right">Total Dû</th>
                   <th className="p-4 font-semibold text-right">Payé</th>
                   <th className="p-4 font-semibold text-right">Solde</th>
                   <th className="p-4 font-semibold text-center">Statut Global</th>
-                  <th className="p-4 font-semibold text-right">Action</th>
+                  <th className="p-4 font-semibold text-right print:hidden">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 print:divide-slate-300">
                 {filteredStudents.map((student) => {
                   const { totalDue, totalPaid, balance } = calculateStudentBalance(student);
                   const isPaid = balance <= 0;
@@ -317,18 +344,18 @@ export default function FinancePage() {
                         <p className="text-xs text-slate-500 font-mono">{getStudentMatricule(student)}</p>
                       </td>
                       <td className="p-4">
-                        <span className="inline-block bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-semibold">{student.class_name}</span>
+                        <span className="inline-block bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-semibold print:bg-transparent print:p-0 print:font-bold">{student.class_name}</span>
                         {student.option && <p className="text-[10px] text-slate-500 mt-1 font-semibold">{student.option}</p>}
                       </td>
                       <td className="p-4 text-right font-semibold text-slate-700">{totalDue.toLocaleString()} {schoolInfo.currency}</td>
                       <td className="p-4 text-right font-semibold text-emerald-600">{totalPaid.toLocaleString()} {schoolInfo.currency}</td>
                       <td className="p-4 text-right font-bold text-red-600">{balance.toLocaleString()} {schoolInfo.currency}</td>
                       <td className="p-4 text-center">
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${isPaid ? 'bg-emerald-100 text-emerald-700' : isPartial ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold print:p-0 print:bg-transparent print:text-slate-800 ${isPaid ? 'bg-emerald-100 text-emerald-700' : isPartial ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
                           {isPaid ? 'En ordre' : isPartial ? 'Partiel' : 'Non payé'}
                         </span>
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-4 text-right print:hidden">
                         <button onClick={() => openStudentAccount(student)} className="px-4 py-2 rounded-xl font-semibold text-sm transition-colors shadow-sm bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 ml-auto">
                            Gérer / Payer
                         </button>
@@ -347,16 +374,16 @@ export default function FinancePage() {
 
       {/* HISTORIQUE DES REÇUS */}
       {activeTab === "history" && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100"><h2 className="text-lg font-bold text-slate-800">Tous les reçus</h2></div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
+          <div className="p-4 border-b border-slate-100 print:hidden"><h2 className="text-lg font-bold text-slate-800">Tous les reçus</h2></div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
-                  <th className="p-4 font-semibold">N° Reçu</th><th className="p-4 font-semibold">Date</th><th className="p-4 font-semibold">Élève</th><th className="p-4 font-semibold">Tranche</th><th className="p-4 font-semibold text-right">Montant</th><th className="p-4 text-right">Action</th>
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200 print:bg-transparent print:text-slate-800 print:border-slate-800">
+                  <th className="p-4 font-semibold">N° Reçu</th><th className="p-4 font-semibold">Date</th><th className="p-4 font-semibold">Élève</th><th className="p-4 font-semibold">Tranche</th><th className="p-4 font-semibold text-right">Montant</th><th className="p-4 text-right print:hidden">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 print:divide-slate-300">
                 {filteredPayments.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-50">
                     <td className="p-4 text-sm font-mono text-slate-700">{p.receipt_number}</td>
@@ -364,7 +391,7 @@ export default function FinancePage() {
                     <td className="p-4 font-bold text-slate-800">{getStudentName(p.students)}</td>
                     <td className="p-4 text-sm text-slate-600">{p.fees?.name || "N/A"}</td>
                     <td className="p-4 text-right font-bold text-emerald-600">{Number(p.amount).toLocaleString()} {schoolInfo.currency}</td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right print:hidden">
                       <button onClick={() => setReceiptData(p)} className="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1 ml-auto"><Printer className="w-4 h-4" /> Reçu</button>
                     </td>
                   </tr>
@@ -377,7 +404,7 @@ export default function FinancePage() {
 
       {/* VUE DES TARIFS */}
       {activeTab === "fees" && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 print:hidden">
           <h2 className="text-lg font-bold text-slate-800 mb-6">Grille Tarifaire</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {fees.map(f => (
@@ -393,7 +420,7 @@ export default function FinancePage() {
 
       {/* MODAL : COMPTE DE L'ÉLÈVE */}
       {isPaymentModalOpen && selectedStudent && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 print:hidden">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
             <div className="bg-slate-800 px-6 py-4 flex justify-between items-center">
               <div>
@@ -471,9 +498,9 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* MODAL REÇU (DESIGN PROFESSIONNEL) */}
+      {/* MODAL REÇU */}
       {receiptData && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto print:hidden">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col my-8">
             
             <div className="bg-slate-800 px-6 py-4 flex justify-between items-center print:hidden sticky top-0 z-10 shadow-md">

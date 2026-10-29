@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { 
   UserPlus, X, Loader2, Users, FileText, CheckCircle2, 
   Phone, MapPin, RefreshCw, Search, Check, AlertCircle, 
-  UserMinus, Trash2, Wallet, Edit
+  UserMinus, Trash2, Wallet, Edit, Printer
 } from "lucide-react";
 
 export default function StudentsPage() {
@@ -21,6 +21,8 @@ export default function StudentsPage() {
   const [actualSchoolId, setActualSchoolId] = useState<string>("");
   const [username, setUsername] = useState("");
   const [userRole, setUserRole] = useState("");
+  // ✅ Ajout de schoolInfo pour l'impression
+  const [schoolInfo, setSchoolInfo] = useState<any>({ school_name: "", school_logo_url: "" });
   
   // Filtres
   const [filterLevel, setFilterLevel] = useState("");
@@ -30,7 +32,7 @@ export default function StudentsPage() {
 
   // Modaux
   const [isModalOpen, setIsModalOpen] = useState(false); 
-  const [editingStudent, setEditingStudent] = useState<any>(null); // ✅ AJOUT : Pour gérer l'édition
+  const [editingStudent, setEditingStudent] = useState<any>(null);
   const [selectedStudent, setSelectedStudent] = useState<any>(null); 
   const [studentPayments, setStudentPayments] = useState<any[]>([]);
 
@@ -46,7 +48,6 @@ export default function StudentsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return router.push("/login");
 
-      // ✅ Récupérer le vrai school_id et le nom
       const { data: userProfile } = await supabase.from("school_users").select("school_id, username, role").eq("email", user.email).maybeSingle();
       const schoolIdToUse = userProfile?.school_id || user.id;
       
@@ -54,17 +55,19 @@ export default function StudentsPage() {
       setUsername(userProfile?.username || "Administrateur");
       setUserRole(userProfile?.role || "Administrateur");
 
-      const [classesRes, studentsRes, optionsRes, yearsRes] = await Promise.all([
+      const [classesRes, studentsRes, optionsRes, yearsRes, schoolRes] = await Promise.all([
         supabase.from("classes").select("*").eq("school_id", schoolIdToUse),
         supabase.from("students").select("*").eq("school_id", schoolIdToUse).order("created_at", { ascending: false }),
         supabase.from("options").select("*").eq("school_id", schoolIdToUse),
-        supabase.from("academic_years").select("*").eq("school_id", schoolIdToUse).eq("is_active", true)
+        supabase.from("academic_years").select("*").eq("school_id", schoolIdToUse).eq("is_active", true),
+        supabase.from("school_settings").select("school_name, school_logo_url").eq("school_id", schoolIdToUse).single()
       ]);
 
       if (classesRes.data) setClasses(classesRes.data);
       if (studentsRes.data) setStudents(studentsRes.data);
       if (optionsRes.data) setOptionsList(optionsRes.data);
       if (yearsRes.data && yearsRes.data.length > 0) setActiveYear(yearsRes.data[0]);
+      if (schoolRes.data) setSchoolInfo(schoolRes.data);
       
       setLoading(false);
     };
@@ -102,13 +105,9 @@ export default function StudentsPage() {
     return true;
   };
 
-  // ✅ AJOUT : Ouvrir le modal en mode ÉDITION
   const openEditModal = (student: any) => {
     setEditingStudent(student);
-    
-    // On retrouve l'ID de la classe à partir de son nom
     const matchingClass = classes.find(c => c.name === student.class_name && c.level === student.level);
-    
     setFormData({
       fullName: student.full_name || "",
       gender: student.gender || "M",
@@ -125,7 +124,6 @@ export default function StudentsPage() {
     setIsModalOpen(true);
   };
 
-  // ✅ AJOUT : Ouvrir le modal en mode CRÉATION
   const openCreateModal = () => {
     setEditingStudent(null);
     setFormData({ 
@@ -136,7 +134,6 @@ export default function StudentsPage() {
     setIsModalOpen(true);
   };
 
-  // ✅ MODIFIÉ : Gère à la fois la création et la modification
   const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeYear) return alert("Veuillez d'abord configurer une année scolaire active.");
@@ -145,7 +142,6 @@ export default function StudentsPage() {
     const selectedClass = classes.find(c => c.id === formData.classId);
 
     if (editingStudent) {
-      // --- MODE MODIFICATION ---
       const updatedData = {
         full_name: formData.fullName,
         gender: formData.gender,
@@ -166,39 +162,24 @@ export default function StudentsPage() {
       if (error) alert("Erreur de modification : " + error.message);
       else if (data) {
         setStudents(students.map(s => s.id === editingStudent.id ? data[0] : s));
-        
-        // Log de modification
         await supabase.from("activity_logs").insert([{
           school_id: actualSchoolId,
           user_name: `${username} (${userRole})`,
           action: "Modification",
           details: `A modifié les informations de l'élève ${formData.fullName}`
         }]);
-
         setIsModalOpen(false);
         setEditingStudent(null);
       }
     } else {
-      // --- MODE CRÉATION (Ton code original) ---
       const generatedMatricule = `BS-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
       const newStudent = {
-        school_id: actualSchoolId, 
-        class_id: formData.classId, 
-        full_name: formData.fullName,
-        gender: formData.gender, 
-        birth_date: formData.birthDate || null,
-        birth_place: formData.birthPlace,
-        previous_school: formData.previousSchool,
-        parent_name: formData.parentName,
-        parent_phone: formData.parentPhone,
-        parent_address: formData.parentAddress,
-        status: "Actif",
-        level: formData.level,
-        class_name: selectedClass?.name, 
-        option: showOptionField() ? formData.option : null,
-        matricule: generatedMatricule, 
-        academic_year: activeYear.name
+        school_id: actualSchoolId, class_id: formData.classId, full_name: formData.fullName,
+        gender: formData.gender, birth_date: formData.birthDate || null, birth_place: formData.birthPlace,
+        previous_school: formData.previousSchool, parent_name: formData.parentName, parent_phone: formData.parentPhone,
+        parent_address: formData.parentAddress, status: "Actif", level: formData.level,
+        class_name: selectedClass?.name, option: showOptionField() ? formData.option : null,
+        matricule: generatedMatricule, academic_year: activeYear.name
       };
 
       const { data, error } = await supabase.from("students").insert([newStudent]).select();
@@ -211,7 +192,6 @@ export default function StudentsPage() {
           action: "Inscription",
           details: `A inscrit l'élève ${formData.fullName} en ${formData.level} ${selectedClass?.name}`
         }]);
-
         setStudents([data[0], ...students]);
         setIsModalOpen(false);
         setFormData({ 
@@ -231,8 +211,6 @@ export default function StudentsPage() {
     if (!error) {
       setStudents(students.map(s => s.id === student.id ? { ...s, status: newStatus } : s));
       setSelectedStudent({ ...student, status: newStatus });
-      
-      // ✅ Log
       await supabase.from("activity_logs").insert([{
         school_id: actualSchoolId,
         user_name: `${username} (${userRole})`,
@@ -244,15 +222,12 @@ export default function StudentsPage() {
 
   const handleDeleteStudent = async (id: string) => {
     if (!confirm("⚠️ Voulez-vous vraiment supprimer définitivement cet élève ?")) return;
-    
     const student = students.find(s => s.id === id);
     const { error } = await supabase.from("students").delete().eq("id", id);
     
     if (!error) {
       setStudents(students.filter(s => s.id !== id));
       setSelectedStudent(null);
-
-      // ✅ Log
       await supabase.from("activity_logs").insert([{
         school_id: actualSchoolId,
         user_name: `${username} (${userRole})`,
@@ -274,15 +249,46 @@ export default function StudentsPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* --- EN-TÊTE D'IMPRESSION UNIQUEMENT --- */}
+      <div className="hidden print:block mb-8 border-b-2 border-slate-800 pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {schoolInfo?.school_logo_url && <img src={schoolInfo.school_logo_url} className="w-16 h-16 object-contain" />}
+            <div>
+              <h1 className="text-2xl font-black uppercase">{schoolInfo?.school_name}</h1>
+              <p className="text-sm font-bold">Année scolaire : {activeYear?.name}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <h2 className="text-xl font-bold uppercase">Liste des Élèves</h2>
+            <p className="text-sm">Imprimé le {new Date().toLocaleDateString('fr-FR')}</p>
+          </div>
+        </div>
+        <div className="mt-2 text-sm font-semibold">
+          Filtres appliqués : 
+          {filterLevel && ` Niveau: ${filterLevel}`} 
+          {filterClass && ` | Classe: ${filterClass}`} 
+          {filterOption && ` | Option: ${filterOption}`}
+          {filterStatus && ` | Statut: ${filterStatus}`}
+        </div>
+      </div>
+
+      {/* EN-TÊTE NORMAL */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Élèves & Inscriptions</h1>
           <p className="text-slate-500 text-sm">Année active : <span className="font-bold text-blue-600">{activeYear?.name || "Aucune"}</span></p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button onClick={() => router.push('/dashboard/re-enrollment')} className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2">
             <RefreshCw className="w-5 h-5 text-emerald-600" /> Réinscription
           </button>
+          
+          {/* ✅ BOUTON IMPRIMER */}
+          <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 shadow-lg shadow-slate-300">
+            <Printer className="w-5 h-5" /> Imprimer
+          </button>
+
           <button onClick={openCreateModal} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 shadow-lg shadow-blue-200">
             <UserPlus className="w-5 h-5" /> Nouvelle inscription
           </button>
@@ -290,13 +296,13 @@ export default function StudentsPage() {
       </div>
 
       {!activeYear && (
-        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-center gap-3 text-orange-800">
+        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-center gap-3 text-orange-800 print:hidden">
           <AlertCircle className="w-5 h-5" />
           <span className="font-bold">Attention :</span> Aucune année scolaire active. Allez dans Configuration.
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
           <div className="h-1 w-8 rounded-full bg-blue-500 mb-3"></div>
           <p className="text-sm font-semibold text-slate-500 mb-1">Total (filtré)</p>
@@ -314,7 +320,7 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center print:hidden">
         <select value={filterLevel} onChange={(e) => { setFilterLevel(e.target.value); setFilterClass(""); setFilterOption(""); }} className="px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm min-w-[150px]">
           <option value="">Tous les niveaux</option>
           {levels.map(l => <option key={l} value={l}>{l}</option>)}
@@ -337,7 +343,7 @@ export default function StudentsPage() {
         </select>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
         {filteredStudents.length === 0 ? (
           <div className="p-16 text-center text-slate-500 flex flex-col items-center">
             <Users className="w-16 h-16 mb-4 text-slate-300" />
@@ -347,39 +353,36 @@ export default function StudentsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200 print:bg-transparent print:text-slate-800 print:border-slate-800">
                   <th className="p-4 font-semibold">Matricule</th>
                   <th className="p-4 font-semibold">Nom Complet</th>
                   <th className="p-4 font-semibold">Classe / Option</th>
                   <th className="p-4 font-semibold">Statut</th>
-                  <th className="p-4 font-semibold text-right">Actions</th>
+                  <th className="p-4 font-semibold text-right print:hidden">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 print:divide-slate-300">
                 {filteredStudents.map((student) => (
                   <tr key={student.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4 text-sm font-mono text-slate-600">{student.matricule}</td>
                     <td className="p-4 font-bold text-slate-800 uppercase">{student.full_name}</td>
                     <td className="p-4">
-                      <span className="inline-block bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-semibold">
+                      <span className="inline-block bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-semibold print:bg-transparent print:p-0 print:font-bold">
                         {student.level} - {student.class_name}
                       </span>
                       {student.option && <p className="text-xs text-indigo-600 font-semibold mt-1">{student.option}</p>}
                     </td>
                     <td className="p-4">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold print:p-0 print:bg-transparent print:text-slate-800 ${
                         student.status === 'Abandonné' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
                       }`}>
                         {student.status || 'Actif'}
                       </span>
                     </td>
-                    <td className="p-4 text-right flex justify-end gap-2">
-                      {/* ✅ BOUTON MODIFIER */}
+                    <td className="p-4 text-right flex justify-end gap-2 print:hidden">
                       <button onClick={() => openEditModal(student)} className="text-orange-600 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors text-sm font-semibold flex items-center gap-1" title="Modifier">
                         <Edit className="w-4 h-4" />
                       </button>
-                      
-                      {/* BOUTON FICHE */}
                       <button onClick={() => openStudentProfile(student)} className="text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors text-sm font-semibold flex items-center gap-1">
                         <FileText className="w-4 h-4" /> Fiche
                       </button>
@@ -392,8 +395,9 @@ export default function StudentsPage() {
         )}
       </div>
 
+      {/* MODAUX INCHANGÉS */}
       {selectedStudent && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
             <div className="bg-slate-800 px-6 py-6 text-white relative">
               <button onClick={() => setSelectedStudent(null)} className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 rounded-full p-1"><X className="w-5 h-5" /></button>
@@ -481,7 +485,7 @@ export default function StudentsPage() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h2 className="text-xl font-bold text-slate-800">
