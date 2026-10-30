@@ -36,11 +36,10 @@ export default function ReportsPage() {
   // Modal Dépenses
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
-    description: "", amount: "", recipient: "", date: "" // ✅ On laisse vide au départ
+    description: "", amount: "", recipient: "", date: "" 
   });
   const [savingExpense, setSavingExpense] = useState(false);
 
-  // ✅ On ajoute la date une fois que la page est chargée (côté client)
   useEffect(() => {
     setExpenseForm(prev => ({ 
       ...prev, 
@@ -52,17 +51,15 @@ export default function ReportsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return router.push("/login");
 
-    // ✅ Récupérer l'ID de l'école et vérifier les permissions
     const { data: userProfile } = await supabase
       .from("school_users")
       .select("school_id, username, role, permissions")
       .eq("email", user.email)
       .maybeSingle();
       
-    // Sécurité : Si ce n'est pas l'admin et qu'il n'a pas la permission Rapports
     if (userProfile && !userProfile.permissions?.reports) {
       alert("⛔ Accès refusé. Vous n'avez pas la permission de voir les rapports financiers.");
-      return router.push("/dashboard"); // Renvoi immédiat au tableau de bord
+      return router.push("/dashboard"); 
     }
 
     const schoolIdToUse = userProfile?.school_id || user.id;
@@ -110,8 +107,14 @@ export default function ReportsPage() {
     return matchLevel && matchClass && matchOption;
   });
 
+  // ✅ MODIFIÉ : Prise en compte de class_name
   const getStudentFinancials = (student: any) => {
-    const studentFees = fees.filter(f => f.level === student.level && (!f.option || f.option === student.option));
+    const studentFees = fees.filter(f => {
+      if (f.level !== student.level) return false;
+      if (f.class_name && f.class_name !== student.class_name) return false;
+      if (f.option && f.option !== student.option) return false;
+      return true;
+    });
     const totalDue = studentFees.reduce((sum, f) => sum + Number(f.amount), 0);
     const studentPayments = payments.filter(p => p.student_id === student.id);
     const totalPaid = studentPayments.reduce((sum, p) => sum + Number(p.amount), 0);
@@ -174,7 +177,6 @@ export default function ReportsPage() {
     }]);
 
     if (!error) {
-      // ✅ Log de l'action
       await supabase.from("activity_logs").insert([{
         school_id: actualSchoolId,
         user_name: `${username} (${userRole})`,
@@ -196,7 +198,6 @@ export default function ReportsPage() {
     const { error } = await supabase.from("expenses").delete().eq("id", id);
     
     if (!error) {
-      // ✅ Log de l'action
       await supabase.from("activity_logs").insert([{
         school_id: actualSchoolId,
         user_name: `${username} (${userRole})`,

@@ -37,7 +37,9 @@ export default function SettingsPage() {
   const [newLevel, setNewLevel] = useState("");
   const [newOption, setNewOption] = useState("");
   const [newClass, setNewClass] = useState({ level: "", name: "", option: "" });
-  const [newFee, setNewFee] = useState({ name: "", level: "Maternelle", option: "", amount: 0 });
+  
+  // ✅ AJOUT : class_name dans le formulaire des frais
+  const [newFee, setNewFee] = useState({ name: "", level: "Maternelle", class_name: "", option: "", amount: 0 });
 
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -175,17 +177,24 @@ export default function SettingsPage() {
     setNewOption(""); fetchData();
   };
 
+  // ✅ MODIFIÉ : Ajout de class_name dans l'insertion
   const addFee = async () => {
     if (!newFee.name || !newFee.amount) return;
     const { data: { user } } = await supabase.auth.getUser();
     await supabase.from("fees").insert([{
-      school_id: user?.id, name: newFee.name, level: newFee.level, 
+      school_id: user?.id, 
+      name: newFee.name, 
+      level: newFee.level, 
+      class_name: newFee.level === "Secondaire" && newFee.class_name !== "" ? newFee.class_name : null,
       option: newFee.level === "Secondaire" && newFee.option !== "" ? newFee.option : null, 
       amount: newFee.amount
     }]);
-    setNewFee({ name: "", level: "Maternelle", option: "", amount: 0 });
+    setNewFee({ name: "", level: "Maternelle", class_name: "", option: "", amount: 0 });
     fetchData();
   };
+
+  // ✅ Filtrer les classes pour la liste déroulante
+  const secondaryClasses = classes.filter(c => c.level === "Secondaire");
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
 
@@ -357,18 +366,42 @@ export default function SettingsPage() {
               <h1 className="text-xl md:text-2xl font-bold text-slate-900 mb-2">Frais & Tranches</h1>
               <div className="bg-slate-50 p-3 md:p-4 rounded-xl md:rounded-2xl border mb-6 md:mb-8 flex flex-col md:flex-row flex-wrap gap-3 md:gap-4 items-stretch md:items-end">
                 <div className="flex-1 min-w-[200px]"><label className="text-xs font-bold">Nom du frais (ex: 1ère Tranche)</label><input value={newFee.name} onChange={e => setNewFee({...newFee, name: e.target.value})} className="w-full px-3 py-2 rounded-lg border mt-1 text-sm outline-none" /></div>
-                <div className="flex-1 min-w-[150px]"><label className="text-xs font-bold">Niveau</label><select value={newFee.level} onChange={e => setNewFee({...newFee, level: e.target.value})} className="w-full px-3 py-2 rounded-lg border mt-1 text-sm outline-none bg-white">{DEFAULT_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+                <div className="flex-1 min-w-[150px]"><label className="text-xs font-bold">Niveau</label><select value={newFee.level} onChange={e => setNewFee({...newFee, level: e.target.value, class_name: "", option: ""})} className="w-full px-3 py-2 rounded-lg border mt-1 text-sm outline-none bg-white">{DEFAULT_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+                
+                {/* ✅ AJOUT : Liste déroulante de la Classe pour le Secondaire */}
                 {newFee.level === "Secondaire" && (
-                  <div className="flex-1 min-w-[150px]"><label className="text-xs font-bold">Option</label><select value={newFee.option} onChange={e => setNewFee({...newFee, option: e.target.value})} className="w-full px-3 py-2 rounded-lg border mt-1 text-sm outline-none bg-white"><option value="">Toutes les options</option>{options.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}</select></div>
+                  <div className="flex-1 min-w-[150px]">
+                    <label className="text-xs font-bold">Classe</label>
+                    <select value={newFee.class_name} onChange={e => setNewFee({...newFee, class_name: e.target.value})} className="w-full px-3 py-2 rounded-lg border mt-1 text-sm outline-none bg-white">
+                      <option value="">Toutes les classes</option>
+                      {secondaryClasses.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
                 )}
+
+                {newFee.level === "Secondaire" && (
+                  <div className="flex-1 min-w-[150px]">
+                    <label className="text-xs font-bold">Option</label>
+                    <select value={newFee.option} onChange={e => setNewFee({...newFee, option: e.target.value})} className="w-full px-3 py-2 rounded-lg border mt-1 text-sm outline-none bg-white">
+                      <option value="">Toutes les options</option>
+                      {options.map(o => <option key={o.id} value={o.name}>{o.name}</option>)}
+                    </select>
+                  </div>
+                )}
+                
                 <div className="w-full md:w-32"><label className="text-xs font-bold">Montant (FC)</label><input type="number" value={newFee.amount} onChange={e => setNewFee({...newFee, amount: Number(e.target.value)})} className="w-full px-3 py-2 rounded-lg border mt-1 text-sm outline-none" /></div>
                 <button onClick={addFee} className="bg-slate-800 text-white px-4 py-2.5 rounded-lg font-bold text-sm h-[42px] w-full md:w-auto">Ajouter</button>
               </div>
+              
               <div className="space-y-3">
                 {fees.map(f => (
                   <div key={f.id} className="flex flex-col md:flex-row justify-between items-start md:items-center p-3 md:p-4 border rounded-xl bg-white shadow-sm gap-2">
                     <div>
-                      <span className="text-[10px] text-blue-600 font-bold uppercase">{f.level} {f.option ? `• ${f.option}` : ''}</span>
+                      <span className="text-[10px] text-blue-600 font-bold uppercase">
+                        {f.level} 
+                        {f.class_name ? ` • ${f.class_name}` : ''} 
+                        {f.option ? ` • ${f.option}` : ''}
+                      </span>
                       <h3 className="font-bold text-sm md:text-base">{f.name}</h3>
                     </div>
                     <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto justify-between md:justify-end">

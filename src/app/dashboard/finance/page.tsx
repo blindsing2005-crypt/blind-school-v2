@@ -103,8 +103,10 @@ export default function FinancePage() {
   };
 
   // --- CALCULS FINANCIERS ---
+  // ✅ MODIFIÉ : On vérifie class_name
   const getStudentFees = (student: any) => fees.filter(f => {
     if (f.level !== student.level) return false;
+    if (f.class_name && f.class_name !== student.class_name) return false;
     if (f.option && f.option !== student.option) return false;
     return true;
   });
@@ -253,7 +255,6 @@ export default function FinancePage() {
           <p className="text-slate-500 text-sm">Gestion des tranches et reçus</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {/* ✅ BOUTON IMPRIMER */}
           <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-md">
             <Printer className="w-4 h-4" /> Imprimer
           </button>
@@ -409,7 +410,7 @@ export default function FinancePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {fees.map(f => (
               <div key={f.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                <span className="text-xs font-bold text-blue-600 uppercase">{f.level} {f.option && `- ${f.option}`}</span>
+                <span className="text-xs font-bold text-blue-600 uppercase">{f.level} {f.class_name ? `- ${f.class_name}` : ''} {f.option && `- ${f.option}`}</span>
                 <h3 className="font-bold text-slate-800 mt-2">{f.name}</h3>
                 <p className="text-xl font-black text-slate-900">{Number(f.amount).toLocaleString()} {schoolInfo.currency}</p>
               </div>
