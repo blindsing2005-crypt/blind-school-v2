@@ -103,9 +103,9 @@ export default function FinancePage() {
   };
 
   // --- CALCULS FINANCIERS ---
-  // ✅ MODIFIÉ : On vérifie class_name
   const getStudentFees = (student: any) => fees.filter(f => {
     if (f.level !== student.level) return false;
+    // ✅ Prise en compte de la classe
     if (f.class_name && f.class_name !== student.class_name) return false;
     if (f.option && f.option !== student.option) return false;
     return true;
@@ -319,8 +319,9 @@ export default function FinancePage() {
           <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 print:hidden">
             <p className="text-sm font-bold text-slate-700">{filteredStudents.length} élève(s) trouvé(s)</p>
           </div>
+          {/* ✅ AJOUT: min-w pour forcer le scroll sur mobile */}
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200 print:bg-transparent print:text-slate-800 print:border-slate-800">
                   <th className="p-4 font-semibold">Élève</th>
@@ -378,7 +379,7 @@ export default function FinancePage() {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
           <div className="p-4 border-b border-slate-100 print:hidden"><h2 className="text-lg font-bold text-slate-800">Tous les reçus</h2></div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[700px]">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200 print:bg-transparent print:text-slate-800 print:border-slate-800">
                   <th className="p-4 font-semibold">N° Reçu</th><th className="p-4 font-semibold">Date</th><th className="p-4 font-semibold">Élève</th><th className="p-4 font-semibold">Tranche</th><th className="p-4 font-semibold text-right">Montant</th><th className="p-4 text-right print:hidden">Action</th>
@@ -435,8 +436,8 @@ export default function FinancePage() {
               {!selectedFeeToPay ? (
                 <>
                   <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Situation des tranches</h3>
-                  <div className="border border-slate-200 rounded-xl overflow-hidden mb-6">
-                    <table className="w-full text-left text-sm">
+                  <div className="border border-slate-200 rounded-xl overflow-x-auto mb-6">
+                    <table className="w-full text-left text-sm min-w-[400px]">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
                           <th className="p-3">Tranche</th>
@@ -499,10 +500,10 @@ export default function FinancePage() {
         </div>
       )}
 
-      {/* MODAL REÇU */}
+      {/* ✅ CORRIGÉ : MODAL REÇU (SANS print:hidden, AVEC print:static) */}
       {receiptData && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto print:hidden">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col my-8">
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto print:static print:bg-white print:block">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col my-8 print:shadow-none print:border-none print:m-0 print:max-w-full">
             
             <div className="bg-slate-800 px-6 py-4 flex justify-between items-center print:hidden sticky top-0 z-10 shadow-md">
               <div className="flex items-center gap-2 text-emerald-400 font-bold"><CheckCircle2 className="w-5 h-5" /> Paiement Enregistré</div>
@@ -516,7 +517,7 @@ export default function FinancePage() {
               </div>
             </div>
 
-            <div className="print-area bg-white p-8 md:p-14 text-slate-900 font-sans" id="receipt-print-area">
+            <div className="bg-white p-8 md:p-14 text-slate-900 font-sans" id="receipt-print-area">
               
               <div className="flex items-center justify-between border-b-2 border-slate-900 pb-6 mb-8">
                 <div className="flex items-center gap-6">

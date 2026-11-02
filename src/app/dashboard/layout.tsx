@@ -151,6 +151,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     const studentFees = fees.filter(f => {
       if (f.level !== student.level) return false;
+      // ✅ Prise en compte de la classe
+      if (f.class_name && f.class_name !== student.class_name) return false;
       if (f.option && f.option !== student.option) return false;
       return true;
     });
@@ -171,6 +173,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!selectedStudent) return [];
     return fees.filter(f => {
       if (f.level !== selectedStudent.level) return false;
+      // ✅ Prise en compte de la classe
+      if (f.class_name && f.class_name !== selectedStudent.class_name) return false;
       if (f.option && f.option !== selectedStudent.option) return false;
       return true;
     });
@@ -273,7 +277,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* ✅ SIDEBAR RESPONSIVE */}
-      <aside className={`w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-40 transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+      <aside className={`w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-40 transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 print:hidden`}>
         <div className="p-6 flex items-center justify-between border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 shrink-0">
@@ -337,7 +341,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* ✅ CONTENU PRINCIPAL (ml-64 retiré sur mobile) */}
       <main className="flex-1 md:ml-64 flex flex-col relative w-full">
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20">
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20 print:hidden">
           <div className="flex items-center gap-3 md:gap-4">
             {/* ✅ BOUTON HAMBURGER POUR MOBILE */}
             <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden text-slate-600 p-1">
@@ -347,9 +351,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-3 md:gap-6">
-            <button onClick={() => setIsSearchOpen(true)} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-500 px-3 py-2 rounded-xl transition-colors md:w-64">
+            <button onClick={() => setIsSearchOpen(true)} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-500 px-3 py-2 rounded-xl transition-colors md:w-64 border border-transparent hover:border-slate-300">
               <Search className="w-4 h-4" />
-              <span className="text-sm hidden md:inline">Rechercher (Élèves...)</span>
+              <span className="text-sm hidden md:inline">Rechercher un élève...</span>
             </button>
 
             <div className="flex items-center gap-3 border-l border-slate-200 pl-3 md:pl-6">
@@ -368,7 +372,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           
           {/* ✅ BANNIÈRE D'ALERTE (3 JOURS) */}
           {subscription && !isExpired && daysLeft <= 3 && (
-            <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl flex items-start gap-3 animate-pulse">
+            <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl flex items-start gap-3 animate-pulse print:hidden">
               <AlertTriangle className="w-6 h-6 text-red-600 shrink-0" />
               <div>
                 <h3 className="font-bold text-red-800">Attention : Expiration imminente !</h3>
@@ -379,7 +383,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* ✅ ÉCRAN DE BLOCAGE SI EXPIRÉ */}
           {isExpired && (
-            <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center rounded-tl-2xl">
+            <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center rounded-tl-2xl print:hidden">
               <div className="bg-red-500/20 p-6 rounded-full mb-6">
                 <Lock className="w-16 h-16 text-red-500" />
               </div>
@@ -412,10 +416,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* MODAL DE RECHERCHE GLOBALE */}
       {isSearchOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-start justify-center pt-24 z-[60] px-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-start justify-center pt-24 z-[60] px-4 print:static print:bg-white print:block print:pt-0">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh] print:max-h-full print:shadow-none print:rounded-none">
             
-            <div className="flex items-center px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+            <div className="flex items-center px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0 print:hidden">
               <Search className="w-6 h-6 text-slate-400 mr-3" />
               <input 
                 autoFocus type="text" placeholder="Rechercher un élève..." 
@@ -425,7 +429,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button onClick={() => setIsSearchOpen(false)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full"><X className="w-5 h-5" /></button>
             </div>
 
-            <div className="overflow-y-auto p-4 md:p-6 relative">
+            <div className="overflow-y-auto p-4 md:p-6 relative print:p-0">
               
               {isSearching && searchResults.length === 0 && (
                 <div className="py-10 text-center flex flex-col items-center">
@@ -604,7 +608,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                   
                   <div className="bg-white p-4 md:p-14 text-slate-900 font-sans rounded-xl border border-slate-200 shadow-sm overflow-x-auto" id="receipt-print-area">
-                    <div className="min-w-[500px]">
+                    <div className="min-w-[500px] print:min-w-0">
                       <div className="flex items-center justify-between border-b-2 border-slate-900 pb-6 mb-8">
                         <div className="flex items-center gap-6">
                           {schoolInfo.school_logo_url ? (

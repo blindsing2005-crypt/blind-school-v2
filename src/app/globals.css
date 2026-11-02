@@ -38,18 +38,43 @@
     visibility: hidden;
   }
   
+  /* ✅ CORRECTION ICI : On force l'affichage de la modale et du reçu, 
+     même s'ils ont la classe print:hidden ou d'autres styles */
+  body.printing-receipt .fixed,
+  body.printing-receipt .fixed > div,
   body.printing-receipt #receipt-print-area,
   body.printing-receipt #receipt-print-area * {
-    visibility: visible;
+    visibility: visible !important;
+    display: block !important; /* Force l'affichage */
   }
   
+  /* On réinitialise la position de la modale pour l'imprimer */
+  body.printing-receipt .fixed {
+    position: static !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    inset: auto !important;
+  }
+
+  /* On enlève les ombres et les marges de la carte blanche pour le papier */
+  body.printing-receipt .fixed > div {
+    box-shadow: none !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+  
+  /* On place le reçu tout en haut à gauche */
   body.printing-receipt #receipt-print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    padding: 15px;
-    background: white;
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    background: white !important;
   }
 }

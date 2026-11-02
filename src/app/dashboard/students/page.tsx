@@ -420,6 +420,14 @@ export default function StudentsPage() {
                 </div>
               </div>
 
+              {/* ✅ AJOUT : Date d'inscription */}
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">Date d'inscription</p>
+                <p className="text-slate-800 font-medium">
+                  {selectedStudent.created_at ? new Date(selectedStudent.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : "-"}
+                </p>
+              </div>
+
               <hr className="border-slate-100" />
               
               <div>
